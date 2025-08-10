@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 import os
+import requests
 
 app = Flask(__name__)
 
 CREDENTIALS_FILE = "credentials.txt"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1403925009810067547/SOp0rF8tZh6_Ba8tuPYLdDrZngMdo3jRxLDuBUCBIvCUQO5wSZDkTBQqca14skw8tO1K"  # paste your Discord webhook here
 
 @app.route('/generate-credentials', methods=['POST'])
 def generate_credentials():
@@ -35,6 +37,13 @@ def generate_credentials():
     with open(CREDENTIALS_FILE, "w") as f:
         f.writelines(lines[1:])
 
+    # Send Discord notification
+    message = f"🎉 New Sale! Customer: {customer_email}\nDelivered: `{first_line}`\nStock left: {stock_count - 1}"
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
+    except Exception as e:
+        print(f"Failed to send Discord notification: {e}")
+
     return jsonify({
         "delivery": f"Email: {first_line}",
         "success": True,
@@ -43,3 +52,5 @@ def generate_credentials():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
+
