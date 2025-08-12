@@ -1,7 +1,17 @@
 from flask import Flask, request, jsonify
+import json
 import os
-import requests
+import shutil  # <-- new
 
+# Ensure credentials file is in persistent storage
+source_file = "credentials.txt"
+dest_file = "/data/credentials.txt"
+
+# Only copy if it doesn't already exist in /data
+if not os.path.exists(dest_file) and os.path.exists(source_file):
+    shutil.copy(source_file, dest_file)
+    print("✅ Copied credentials.txt to /data")
+    
 app = Flask(__name__)
 
 CREDENTIALS_FILE = "/data/credentials.txt"
@@ -52,6 +62,7 @@ def generate_credentials():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
 
 
 
