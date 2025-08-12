@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-CREDENTIALS_FILE = "credentials.txt"
+CREDENTIALS_FILE = "/data/credentials.txt"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1403925009810067547/SOp0rF8tZh6_Ba8tuPYLdDrZngMdo3jRxLDuBUCBIvCUQO5wSZDkTBQqca14skw8tO1K"  # paste your Discord webhook here
 
 @app.route('/generate-credentials', methods=['POST'])
@@ -52,5 +52,6 @@ def generate_credentials():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
 
 
