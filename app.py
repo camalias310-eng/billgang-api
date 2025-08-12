@@ -1,10 +1,8 @@
 from flask import Flask, request, jsonify
+import json
 import os
 import shutil
-import requests
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests  # make sure requests is installed
 
 # Ensure credentials file is in persistent storage
 source_file = "credentials.txt"
@@ -17,34 +15,11 @@ if not os.path.exists(dest_file) and os.path.exists(source_file):
 app = Flask(__name__)
 
 CREDENTIALS_FILE = "/data/credentials.txt"
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1403925009810067547/SOp0rF8tZh6_Ba8tuPYLdDrZngMdo3jRxLDuBUCBIvCUQO5wSZDkTBQqca14skw8tO1K"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1403925009810067547/SOp0rF8tZh6_Ba8tuPYLdDrZngMdo3jRxLDuBUCBIvCUQO5wSZDkTBQqca14skw8tO1K"  # replace with your actual webhook
 
-# Email sending config (replace with your real email & app password)
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-EMAIL_ADDRESS = "camalias310@gmail.com"
-EMAIL_PASSWORD = "wxgmhtjpfaqqwxfd"  # Gmail app password, not normal login
-
-def send_email(to_email, credentials):
-    subject = "Your Login Details"
-    body = f"Hello,\n\nHere are your login details:\n{credentials}\n\nThank you for your purchase!"
-
-    msg = MIMEMultipart()
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_ADDRESS, to_email, msg.as_string())
-        server.quit()
-        print(f"✅ Email sent to {to_email}")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-
+# -------------------------
+# API endpoint (Billgang webhook)
+# -------------------------
 @app.route('/generate-credentials', methods=['POST'])
 def generate_credentials():
     customer_email = request.json.get('customer_email', '')
@@ -57,7 +32,7 @@ def generate_credentials():
         })
 
     with open(CREDENTIALS_FILE, "r") as f:
-        lines = [line.strip() for line in f if line.strip()]
+        lines = f.readlines()
 
     stock_count = len(lines)
 
@@ -68,27 +43,69 @@ def generate_credentials():
             "stock": 0
         })
 
-    # Get and remove the first credential
-    first_credential = lines[0]
+    # Get first credential
+    first_line = lines[0].strip()
     with open(CREDENTIALS_FILE, "w") as f:
-        f.write("\n".join(lines[1:]) + "\n")
+        f.writelines(lines[1:])
 
     # Send Discord notification
-    message = f"🎉 New Sale! Customer: {customer_email}\nDelivered: `{first_credential}`\nStock left: {stock_count - 1}"
+    message = f"🎉 New Sale! Customer: {customer_email}\nDelivered: `{first_line}`\nStock left: {stock_count - 1}"
     try:
         requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
     except Exception as e:
         print(f"Failed to send Discord notification: {e}")
 
-    # Send email to customer
-    if customer_email:
-        send_email(customer_email, first_credential)
-
     return jsonify({
-        "delivery": first_credential,
+        "delivery": f"Email: {first_line}",
         "success": True,
         "stock": stock_count - 1
     })
+
+# -------------------------
+# Thank You Page route
+# -------------------------
+@app.route('/thankyou', methods=['GET'])
+def thank_you_page():
+    if not os.path.exists(CREDENTIALS_FILE):
+        return "<h2>Sorry, we’re out of stock!</h2>"
+
+    with open(CREDENTIALS_FILE, "r") as f:
+        lines = f.readlines()
+
+    if not lines:
+        return "<h2>Sorry, we’re out of stock!</h2>"
+
+    # Get first credential
+    first_line = lines[0].strip()
+    with open(CREDENTIALS_FILE, "w") as f:
+        f.writelines(lines[1:])
+
+    # Split into email & password
+    if "," in first_line:
+        email, password = first_line.split(",", 1)
+    else:
+        email = first_line
+        password = "(no password found)"
+
+    # Send Discord notification
+    message = f"🎉 New Sale via Thank You page!\nDelivered: `{first_line}`\nStock left: {len(lines) - 1}"
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
+    except Exception as e:
+        print(f"Failed to send Discord notification: {e}")
+
+    # HTML thank you page
+    return f"""
+    <html>
+    <body style="font-family: Arial; text-align: center; padding: 50px;">
+        <h1>🎉 Thanks for your order!</h1>
+        <p>Here are your login details:</p>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Password:</strong> {password}</p>
+        <p><em>Make sure to save these details securely.</em></p>
+    </body>
+    </html>
+    """
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
